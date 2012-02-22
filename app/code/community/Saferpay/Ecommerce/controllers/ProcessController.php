@@ -22,7 +22,12 @@
 class Saferpay_Ecommerce_ProcessController extends Mage_Core_Controller_Front_Action
 {
 	public function successAction(){
-		$this->_redirect('checkout/'.($this->_processPayment('success') ? 'onepage/success' : 'cart'));
+		if ($this->_processPayment('success')) {
+			$this->_getSession()->getQuote()->setIsActive(false)->save();
+			$this->_redirect('checkout/onepage/success');
+		} else {
+			$this->_redirect('checkout/cart');
+		}
 	}
 
 	public function notifyAction(){
