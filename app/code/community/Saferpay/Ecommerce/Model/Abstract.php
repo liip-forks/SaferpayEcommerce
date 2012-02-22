@@ -38,7 +38,7 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 	protected $_canAuthorize           = true;
 	protected $_canCapture             = true;
 	protected $_canCapturePartial      = false;
-	protected $_canRefund              = false;
+	protected $_canRefund              = true;
 	protected $_canVoid                = false;
 	protected $_canUseInternal         = false;
 	protected $_canUseCheckout         = true;
@@ -286,5 +286,79 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 			$msg = $this->getConfigData('generic_error_msg');
 		}
 		Mage::throwException(Mage::helper('saferpay')->__($msg, $params));
+	}
+	
+	/**
+	 * refund the amount with transaction id
+	 *
+	 * @access public
+	 * @param string $payment Varien_Object object
+	 * @return Mage_Payment_Model_Abstract
+	 */
+	public function refund(Varien_Object $payment, $amount) {
+
+		$order = $payment->getOrder();
+
+		$params = array(
+			'ACCOUNTID' => Mage::getStoreConfig('saferpay/settings/saferpay_account_id'),
+			'AMOUNT' => ($amount * 100),
+			'CURRENCY' => $this->getOrder()->getOrderCurrencyCode(),
+			'REFID' => $payment->getRefundTransactionId(),
+			'DESCRIPTION' => 'Refunding order ' . $order->getIncrementId(),
+			'REFOID' => $order->getIncrementId(),
+			'ACTION' => 'Credit',
+			'spPassword' => Mage::getStoreConfig('saferpay/settings/saferpay_password')
+		);
+
+		Mage::log('Refunding payment for order #'.$order->getIncrementId().': '. print_r($params, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
+
+		$url = Mage::getStoreConfig('saferpay/settings/execute_base_url');
+
+		$response = Mage::helper('saferpay')->process_url($url, $params);
+		
+		Mage::log('Refunding response for order #'.$order->getIncrementId().': '. print_r($response, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
+		list($status, $xml) = Mage::helper('saferpay')->splitResponseData($response);
+
+		if ($status != 'OK') {
+			$this->_throwException($data);
+		}
+        
+        $data = $this->_parseResponseXml($xml);
+
+		$id = '';
+		// check saferpay result code of authorization (0 = success)
+		if ($data['RESULT'] == 0) {
+			$id = $data['ID'];
+			Mage::log('Refunded order '.$order->getIncrementId().': ' . print_r($data, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
+		} else {
+			Mage::log('Refund for order '.$id.' failed (result code ' . $data['RESULT'] . ') : '. $response, Zend_Log::ERR, 'saferpay_ecommerce.log');
+			$this->_throwException('Refund failed (result code ' . $data['RESULT'] . ')');
+		}
+
+		$payment->setLastTransId($id);
+		$params = array(
+			'ACCOUNTID' => Mage::getStoreConfig('saferpay/settings/saferpay_account_id'),
+			'ID' => $id,
+			'spPassword' => Mage::getStoreConfig('saferpay/settings/saferpay_password')
+		);
+
+		Mage::log('Finishing refunding #'.$order->getIncrementId().': ' . print_r($params, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
+
+		$url = Mage::getStoreConfig('saferpay/settings/paycomplete_base_url');
+
+		$response = Mage::helper('saferpay')->process_url($url, $params);
+		list($status, $data) = Mage::helper('saferpay')->splitResponseData($response);
+
+		if ($status != 'OK') {
+			$this->_throwException($data);
+		}
+		$payment->setStatus(self::STATUS_SUCCESS);
+
+		$amount = Mage::helper('core')->formatPrice(Mage::helper('saferpay')->round($amount, 2), false);
+		$this->getOrder()->addStatusHistoryComment(
+				Mage::helper('saferpay')->__('Refund for %s successfull (ID %s)', $amount, $id)
+			)->save(); // save history model
+
+		return $this;
 	}
 }
