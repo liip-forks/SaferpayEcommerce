@@ -317,7 +317,7 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 		$response = Mage::helper('saferpay')->process_url($url, $params);
 		
 		Mage::log('Refunding response for order #'.$order->getIncrementId().': '. print_r($response, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
-		list($status, $xml) = Mage::helper('saferpay')->splitResponseData($response);
+		list($status, $xml) = Mage::helper('saferpay')->_splitResponseData($response);
 
 		if ($status != 'OK') {
 			$this->_throwException($data);
@@ -347,7 +347,7 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 		$url = Mage::getStoreConfig('saferpay/settings/paycomplete_base_url');
 
 		$response = Mage::helper('saferpay')->process_url($url, $params);
-		list($status, $data) = Mage::helper('saferpay')->splitResponseData($response);
+		list($status, $data) = Mage::helper('saferpay')->_splitResponseData($response);
 
 		if ($status != 'OK') {
 			$this->_throwException($data);
