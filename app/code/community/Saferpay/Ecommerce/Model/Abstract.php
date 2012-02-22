@@ -44,18 +44,18 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 	protected $_canUseCheckout         = true;
 	protected $_canUseForMultishipping = false;
 
-    protected $_order;
+	protected $_order;
 	
 	const STATE_AUTHORIZED = 'authorized';
 
-    /**
-     * Get order model
-     *
-     * @return Mage_Sales_Model_Order
-     */
-    public function getOrder()
-    {
-        if (!$this->_order) {
+	/**
+	 * Get order model
+	 *
+	 * @return Mage_Sales_Model_Order
+	 */
+	public function getOrder()
+	{
+		if (!$this->_order) {
 			try{
 				$this->_order = $this->getInfoInstance()->getOrder();
 				if (! $this->_order)
@@ -72,9 +72,9 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 				$id = $this->getSession()->getLastOrderId();
 				$this->_order = Mage::getModel('sales/order')->load($id);
 			}
-        }
-        return $this->_order;
-    }
+		}
+		return $this->_order;
+	}
 
 	/**
 	 *
@@ -83,6 +83,18 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 	public function getSession()
 	{
 		return Mage::getSingleton('checkout/session');
+	}
+
+	protected function _parseResponseXml($xml)
+	{
+		$data = array();
+		if ($xml)
+		{
+			$xml = simplexml_load_string($xml);
+			$data = (array) $xml->attributes();
+			$data = $data['@attributes'];
+		}
+		return $data;
 	}
 
 	/**
@@ -179,7 +191,7 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 			'PROVIDERSET'           => $this->getProviderId(),
 			'LANGID'                => $this->getLangId(),
 			'SHOWLANGUAGES'         => $this->getUseDefaultLangId() ? 'yes' : 'no',
-			'DELIVERY'				=> 'no',
+            'DELIVERY'				=> 'no',
 			'VTCONFIG'				=> Mage::helper('saferpay')->getSetting('vtconfig')
 		);
 
@@ -287,7 +299,28 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 		}
 		Mage::throwException(Mage::helper('saferpay')->__($msg, $params));
 	}
-	
+
+	/**
+	 * Seperate the result status and the xml in the response
+	 *
+	 * @param string $response
+	 * @return array
+	 */
+	protected function _splitResponseData($response)
+	{
+		if (($pos = strpos($response, ':')) === false)
+		{
+			$status = $response;
+			$xml = '';
+		}
+		else
+		{
+			$status = substr($response, 0, strpos($response, ':'));
+			$xml = substr($response, strpos($response, ':')+1);
+		}
+		return array($status, $xml);
+	}
+
 	/**
 	 * refund the amount with transaction id
 	 *
@@ -315,15 +348,15 @@ abstract class Saferpay_Ecommerce_Model_Abstract extends Mage_Payment_Model_Meth
 		$url = Mage::getStoreConfig('saferpay/settings/execute_base_url');
 
 		$response = Mage::helper('saferpay')->process_url($url, $params);
-		
+
 		Mage::log('Refunding response for order #'.$order->getIncrementId().': '. print_r($response, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
-		list($status, $xml) = Mage::helper('saferpay')->_splitResponseData($response);
+		list($status, $xml) = $this->_splitResponseData($response);
 
 		if ($status != 'OK') {
-			$this->_throwException($data);
+			$this->_throwException($xml);
 		}
-        
-        $data = $this->_parseResponseXml($xml);
+
+		$data = $this->_parseResponseXml($xml);
 
 		$id = '';
 		// check saferpay result code of authorization (0 = success)
