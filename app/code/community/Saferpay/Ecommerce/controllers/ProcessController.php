@@ -31,11 +31,13 @@ class Saferpay_Ecommerce_ProcessController extends Mage_Core_Controller_Front_Ac
 	}
 
 	public function backAction(){
-        $this->_abortPayment('canceled');
+		$this->_abortPayment('canceled');
+		$this->_getSession()->addError(Mage::helper('saferpay')->__('You canceled the payment processing. Please try again.'));
 	}
 
 	public function failAction(){
-        $this->_abortPayment('failed');
+		$this->_abortPayment('failed');
+		$this->_getSession()->addError(Mage::helper('saferpay')->__('An error occured while processing the payment, please try again later.'));
 	}
 
 	public function _abortPayment($event){
@@ -72,6 +74,7 @@ class Saferpay_Ecommerce_ProcessController extends Mage_Core_Controller_Front_Ac
 			);
 			$url = Mage::getStoreConfig('saferpay/settings/verifysig_base_url');
 			$response = Mage::helper('saferpay')->process_url($url, $params);
+			Mage::log('NotifyAction for order : ' . $order->getIncrementId() . ' value: ' . print_r($response, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
 			list($status, $ret) = Mage::helper('saferpay')->_splitResponseData($response);
 			if ($status != 'OK'){
 				Mage::throwException(Mage::helper('saferpay')->__('Signature invalid, possible manipulation detected! Validation Result: "%s"', $response));
@@ -91,6 +94,7 @@ class Saferpay_Ecommerce_ProcessController extends Mage_Core_Controller_Front_Ac
 					}
 					$url = Mage::getStoreConfig('saferpay/settings/paycomplete_base_url');
 					$response = Mage::helper('saferpay')->process_url($url, $params);
+					Mage::log('Paycomplete response for order: ' . $order->getIncrementId() . ' value: ' . print_r($response, true), Zend_Log::DEBUG, 'saferpay_ecommerce.log');
 					list($status, $params) = Mage::helper('saferpay')->_splitResponseData($response);
 					$params = Mage::helper('saferpay')->_parseResponseXml($params);
 					if ($status == 'OK' && is_array($params) && isset($params['RESULT']) && $params['RESULT'] == 0){
@@ -126,5 +130,14 @@ class Saferpay_Ecommerce_ProcessController extends Mage_Core_Controller_Front_Ac
 			$_session->addError(Mage::helper('saferpay')->__('An error occured while processing the payment, please contact the store owner for assistance.'));
 			return false;
 		}	
+	}
+
+	/**
+	 *
+	 * @return Mage_Checkout_Model_Session
+	 */
+	protected function _getSession()
+	{
+		return Mage::getSingleton('checkout/session');
 	}
 }
