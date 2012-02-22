@@ -86,6 +86,7 @@ class Saferpay_Ecommerce_ProcessController extends Mage_Core_Controller_Front_Ac
 				if ($this->getRequest()->getParam('capture', '') == Mage_Payment_Model_Method_Abstract::ACTION_AUTHORIZE_CAPTURE){
 					$params = array(
 						'ACCOUNTID' => Mage::helper('saferpay')->getSetting('saferpay_account_id'),
+						'spPassword' => Mage::helper('saferpay')->getSetting('saferpay_password'),
 						'ID' => $ret['ID']
 					);
 					if(Mage::helper('saferpay')->getSetting('saferpay_account_id') == '99867-94913159'){
