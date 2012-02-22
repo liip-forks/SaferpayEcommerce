@@ -108,8 +108,14 @@ class Saferpay_Ecommerce_ProcessController extends Mage_Core_Controller_Front_Ac
 						if (!$order->canInvoice()) {
 							Mage::throwException($this->__('Can not create an invoice.'));
 						}
+						$payment->setAdditionalInformation('id', $ret['ID']);
+						$payment->setTransactionId($ret['ID']);
+						$payment->setLastTransId($ret['ID']);
+						$payment->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_CAPTURE);
+
 						$invoice = $order->prepareInvoice();
 						$invoice->register()->capture();
+						$invoice->setTransactionId($ret['ID']);
 						$order->addRelatedObject($invoice);
 						$order->sendNewOrderEmail()
 							  ->setEmailSent(true)
